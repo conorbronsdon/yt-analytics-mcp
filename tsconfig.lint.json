@@ -1,0 +1,14 @@
+{
+  // Type-checking config only — never emits.
+  //
+  // tsconfig.json excludes src/__tests__ from the *emit* so tests do not compile
+  // into dist/ and ship in the npm tarball. That exclusion also removed them
+  // from `tsc --noEmit`, which meant a type error in a test file passed lint and
+  // only surfaced when vitest ran. This config type-checks everything.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
