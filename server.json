@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.conorbronsdon/yt-analytics-mcp",
+  "title": "YouTube Analytics MCP Server",
+  "description": "Owner-side YouTube Analytics for AI agents: watch time, retention, traffic sources, playlists.",
+  "repository": {
+    "url": "https://github.com/conorbronsdon/yt-analytics-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@conorbronsdon/yt-analytics-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "YT_ANALYTICS_CREDENTIALS_PATH",
+          "description": "Path to the OAuth credential JSON (default ~/.config/gws/youtube_credentials.json)",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

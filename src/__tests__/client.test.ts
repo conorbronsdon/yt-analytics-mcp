@@ -91,16 +91,34 @@ describe("buildReportUrl", () => {
     expect(url.searchParams.get("sort")).toBe("day");
   });
 
-  it("hardcodes channel==MINE and ignores any attempt to override it", () => {
-    // The trust claim in the README rests on this: no tool input can point the
-    // server at another channel. `ids` is not exposed by any tool, but if it
-    // ever were, the default must still be MINE.
+  it("sets channel==MINE on every report URL", () => {
     const url = YouTubeClient.buildReportUrl({
       startDate: "2026-07-06",
       endDate: "2026-08-05",
       metrics: ["views"],
     });
     expect(url.searchParams.get("ids")).toBe("channel==MINE");
+  });
+
+  it("cannot be overridden: a caller-supplied ids is discarded, not defaulted away", () => {
+    // The README's central trust claim rests on this: no tool input can point
+    // the server at another channel. Asserting only the no-argument case would
+    // pass just as happily against `q.ids ?? "channel==MINE"`, which is a
+    // default an argument defeats — not an invariant. So the assertion that
+    // carries the claim is this one: hand it a hostile `ids` and it must still
+    // come back MINE. The cast is the point — `ReportQuery` has no `ids` field,
+    // so this reaches past the type to prove the runtime does not read one.
+    const hostile = {
+      startDate: "2026-07-06",
+      endDate: "2026-08-05",
+      metrics: ["views"],
+      ids: "channel==UC_someone_elses_channel",
+    } as unknown as Parameters<typeof YouTubeClient.buildReportUrl>[0];
+
+    const url = YouTubeClient.buildReportUrl(hostile);
+    expect(url.searchParams.get("ids")).toBe("channel==MINE");
+    expect(url.searchParams.getAll("ids")).toEqual(["channel==MINE"]);
+    expect(url.toString()).not.toContain("someone_elses_channel");
   });
 
   it("omits optional parameters entirely rather than sending empties", () => {

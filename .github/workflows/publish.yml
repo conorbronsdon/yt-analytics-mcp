@@ -1,0 +1,139 @@
+# THE FIRST PUBLISH CANNOT HAPPEN HERE. Do it by hand.
+#
+# This workflow authenticates with npm Trusted Publishing: `id-token: write`
+# plus `npm publish --provenance`, and no NODE_AUTH_TOKEN anywhere. Trusted
+# Publishing is configured per package on npmjs.com, under the package's
+# Settings, and a package that does not exist yet has no settings page. So on a
+# first run the version check reads `published=none`, decides there is work to
+# do, and the publish step 404s on the PUT.
+#
+# First release, once:
+#   npm login
+#   npm publish --access public          # from a clean checkout of main
+#
+# Then, on npmjs.com > the package > Settings > Trusted Publisher, add this
+# repository and this workflow file. Every release after that runs here, and
+# keeps provenance.
+name: Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          # Node 24 ships npm >=11.5.1 with sigstore intact; self-upgrading npm on the
+          # Node 22 runner broke provenance publish ("Cannot find module sigstore").
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Check if package.json version is already published
+        id: version
+        run: |
+          LOCAL_VERSION="$(node -p "require('./package.json').version")"
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          PUBLISHED_VERSION="$(npm view "$PKG_NAME" version 2>/dev/null || echo none)"
+          echo "local=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "published=$PUBLISHED_VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$LOCAL_VERSION" = "$PUBLISHED_VERSION" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "package.json version ($LOCAL_VERSION) is already published — nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "package.json version ($LOCAL_VERSION) differs from published ($PUBLISHED_VERSION) — publishing."
+          fi
+
+      - name: Install dependencies
+        if: steps.version.outputs.changed == 'true'
+        run: npm ci
+
+      - name: Build
+        if: steps.version.outputs.changed == 'true'
+        run: npm run build --if-present
+
+      - name: Test
+        if: steps.version.outputs.changed == 'true'
+        run: npm test --if-present
+
+      - name: Show tool versions
+        if: steps.version.outputs.changed == 'true'
+        run: node --version && npm --version
+
+      # Trusted Publishing only. This fails with a 404 until the package exists
+      # on npm and has this repo registered as a trusted publisher — see the
+      # comment at the top of this file for the one-time manual first publish.
+      - name: Publish to npm
+        if: steps.version.outputs.changed == 'true'
+        run: npm publish --provenance --access public
+
+      # server.json is derived from package.json at publish time so the two can
+      # never drift. The write is never committed, so the server.json in git can
+      # still show a stale version between releases — what this guarantees is the
+      # published artifact, not the file on main.
+      - name: Sync server.json version from package.json
+        run: |
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const server = JSON.parse(fs.readFileSync("server.json", "utf8"));
+            server.version = pkg.version;
+            for (const p of server.packages || []) p.version = pkg.version;
+            fs.writeFileSync("server.json", JSON.stringify(server, null, 2) + "\n");
+          '
+          node -p "\"server.json is now at \" + require('./server.json').version"
+
+      # Checked independently of the npm gate above: npm and the registry can be
+      # out of sync on their own, so a workflow_dispatch has to be able to push a
+      # registry-only catch-up without an npm version bump.
+      - name: Check if version is already in the MCP registry
+        id: registry
+        run: |
+          SERVER_NAME="$(node -p "require('./package.json').mcpName")"
+          LOCAL_VERSION="${{ steps.version.outputs.local }}"
+          if curl -fsSL "https://registry.modelcontextprotocol.io/v0.1/servers?search=$SERVER_NAME" -o registry.json; then
+            REGISTRY_VERSION="$(SERVER_NAME="$SERVER_NAME" node -p "const r = JSON.parse(require('fs').readFileSync('registry.json', 'utf8')).servers || []; const m = r.find(s => s.server && s.server.name === process.env.SERVER_NAME); m ? m.server.version : 'none'")"
+          else
+            REGISTRY_VERSION=unknown
+            echo "Registry lookup failed — will attempt the publish and let it decide."
+          fi
+          rm -f registry.json
+          if [ "$LOCAL_VERSION" = "$REGISTRY_VERSION" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "MCP registry already has $SERVER_NAME@$LOCAL_VERSION — nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "MCP registry has $REGISTRY_VERSION, package.json is $LOCAL_VERSION — publishing."
+          fi
+
+      - name: Publish to the MCP registry
+        if: steps.registry.outputs.changed == 'true'
+        # Pinned: an unpinned /latest/ URL silently changes the CLI under CI.
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.0/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+
+      - name: Create GitHub release
+        if: steps.version.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.local }}"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists — skipping."
+          else
+            gh release create "v$VERSION" --target "$GITHUB_SHA" --generate-notes
+          fi

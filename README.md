@@ -4,8 +4,11 @@
 
 Owner-side YouTube analytics for AI agents: watch time, traffic sources, audience retention, playlist and podcast-series metrics, and episode-over-episode comparison. Read-only, all of it.
 
+[![CI](https://github.com/conorbronsdon/yt-analytics-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/conorbronsdon/yt-analytics-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/Node-20.19+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Podcast](https://img.shields.io/badge/Podcast-Chain_of_Thought-purple?style=flat-square)](https://chainofthought.show/?utm_source=github&utm_medium=referral&utm_campaign=repo-readme&utm_content=yt-analytics-mcp)
+[![X](https://img.shields.io/badge/X-@ConorBronsdon-black?style=flat-square&logo=x)](https://x.com/ConorBronsdon)
 
 </div>
 
@@ -169,7 +172,17 @@ Issues and pull requests welcome. If a YouTube Analytics report is worth wrappin
 
 ## About
 
-Built and maintained by [Conor Bronsdon](https://github.com/conorbronsdon). I host the [Chain of Thought](https://chainofthought.show) podcast, which covers AI infrastructure, developer tools, and how practitioners actually use this stuff. I built this to pull YouTube's owner-side numbers into the agent workflows that run the show.
+Built and maintained by [Conor Bronsdon](https://conorbronsdon.com/?utm_source=github&utm_medium=referral&utm_campaign=repo-readme&utm_content=yt-analytics-mcp). I host the [Chain of Thought](https://chainofthought.show/?utm_source=github&utm_medium=referral&utm_campaign=repo-readme&utm_content=yt-analytics-mcp) podcast, which covers AI infrastructure, developer tools, and how practitioners actually use this stuff. I built this to pull YouTube's owner-side numbers into the agent workflows that run the show.
+
+Companion tools:
+
+- [gsc-mcp](https://github.com/conorbronsdon/gsc-mcp): Search Console — search performance, striking-distance keywords, sitemaps, URL inspection.
+- [gws-mcp-server](https://github.com/conorbronsdon/gws-mcp-server): Google Workspace — Gmail, Calendar, Drive, Sheets, Docs, Tasks.
+- [op3-mcp](https://github.com/conorbronsdon/op3-mcp): podcast analytics through OP3 — downloads, geography, apps, per-episode breakdowns.
+- [Transistor-MCP](https://github.com/conorbronsdon/Transistor-MCP): the Transistor.fm MCP server — episodes, transcripts, download counts.
+- [ai-tools-for-creators](https://github.com/conorbronsdon/ai-tools-for-creators): a curated list of AI skills and MCP servers for people who ship ideas for a living.
+
+More at [conorbronsdon.com](https://conorbronsdon.com/?utm_source=github&utm_medium=referral&utm_campaign=repo-readme&utm_content=yt-analytics-mcp), [chainofthought.show](https://chainofthought.show/?utm_source=github&utm_medium=referral&utm_campaign=repo-readme&utm_content=yt-analytics-mcp), [GitHub](https://github.com/conorbronsdon), [X](https://x.com/ConorBronsdon), and [LinkedIn](https://www.linkedin.com/in/conorbronsdon/).
 
 ---
 

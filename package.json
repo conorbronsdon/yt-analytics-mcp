@@ -48,5 +48,13 @@
   ],
   "license": "MIT",
   "author": "Conor Bronsdon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conorbronsdon/yt-analytics-mcp.git"
+  },
+  "homepage": "https://github.com/conorbronsdon/yt-analytics-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/conorbronsdon/yt-analytics-mcp/issues"
+  },
   "mcpName": "io.github.conorbronsdon/yt-analytics-mcp"
 }

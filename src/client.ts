@@ -32,8 +32,10 @@ export const DATA_API_BATCH_SIZE = 50;
  * pasted into Google's query explorer.
  */
 export interface ReportQuery {
-  /** Always "channel==MINE" for this server. See `YouTubeClient.report`. */
-  ids?: string;
+  // No `ids` field, deliberately. `channel==MINE` is written by
+  // `buildReportUrl` and is not expressible as a caller argument — see the
+  // comment there. Adding `ids` back here would turn the server's central
+  // trust claim from an invariant into a default.
   startDate: string;
   endDate: string;
   metrics: string[];
@@ -136,8 +138,11 @@ export class YouTubeClient {
     const p = url.searchParams;
     // Hardcoded, not caller-supplied. `channel==MINE` is the whole trust story:
     // the server can only ever read the channel the credential owns, so no tool
-    // input can redirect it at someone else's data.
-    p.set("ids", q.ids ?? "channel==MINE");
+    // input can redirect it at someone else's data. This is written
+    // unconditionally and `ReportQuery` has no `ids` field, so an override is
+    // not merely defaulted away — it cannot be expressed. Pinned by the
+    // "cannot be overridden" test in src/__tests__/client.test.ts.
+    p.set("ids", "channel==MINE");
     p.set("startDate", q.startDate);
     p.set("endDate", q.endDate);
     p.set("metrics", q.metrics.join(","));
