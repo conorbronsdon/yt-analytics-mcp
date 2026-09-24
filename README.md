@@ -179,7 +179,7 @@ Companion tools:
 - [gsc-mcp](https://github.com/conorbronsdon/gsc-mcp): Search Console — search performance, striking-distance keywords, sitemaps, URL inspection.
 - [gws-mcp-server](https://github.com/conorbronsdon/gws-mcp-server): Google Workspace — Gmail, Calendar, Drive, Sheets, Docs, Tasks.
 - [op3-mcp](https://github.com/conorbronsdon/op3-mcp): podcast analytics through OP3 — downloads, geography, apps, per-episode breakdowns.
-- [Transistor-MCP](https://github.com/conorbronsdon/Transistor-MCP): the Transistor.fm MCP server — episodes, transcripts, download counts.
+- [Transistor MCP](https://mcp.transistor.fm): Transistor.fm's official MCP server. Episodes, publishing, and analytics.
 - [ai-tools-for-creators](https://github.com/conorbronsdon/ai-tools-for-creators): a curated list of AI skills and MCP servers for people who ship ideas for a living.
 
 More at [conorbronsdon.com](https://conorbronsdon.com/?utm_source=github&utm_medium=referral&utm_campaign=repo-readme&utm_content=yt-analytics-mcp), [chainofthought.show](https://chainofthought.show/?utm_source=github&utm_medium=referral&utm_campaign=repo-readme&utm_content=yt-analytics-mcp), [GitHub](https://github.com/conorbronsdon), [X](https://x.com/ConorBronsdon), and [LinkedIn](https://www.linkedin.com/in/conorbronsdon/).
