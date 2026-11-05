@@ -1,5 +1,7 @@
 # AGENTS.md
 
+The repository contract for every agent runtime. Codex and other runtimes read this file directly; Claude Code reads it through `CLAUDE.md`, which imports it.
+
 Working notes for agents (and humans) editing this repo. Every rule below either names the check that enforces it or is marked **unenforced**.
 
 ## What this is
