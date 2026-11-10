@@ -420,8 +420,9 @@ export function createServer(
             "'none' returns one summary row for the whole range. 'day' or 'month' " +
               "returns a time series — a 90-day range at 'day' is 90 rows, so keep " +
               "ranges short or use 'month'. 'month' requires start_date to be the " +
-              "1st of a month and end_date to be a month's last day (or its 1st); the " +
-              "server sends the API the 1st of the final month, which is the form it accepts.",
+              "1st of a month and end_date to be a month's last day (or its 1st); " +
+              "either date selects that calendar month's bucket. The server sends the API " +
+              "the 1st of the final month, which is the form it accepts.",
           ),
       },
       annotations: buildAnnotations("Channel performance over a date range"),
@@ -444,6 +445,13 @@ export function createServer(
       const rows = toObjects(res);
       return json({
         window: { startDate: start_date, endDate: end_date },
+        ...(group_by === "month" ? {
+          monthBuckets: {
+            firstMonth: start_date.slice(0, 7),
+            lastMonth: end_date.slice(0, 7),
+            note: "The window records the requested dates. Each monthly row covers its calendar month; the final month may be incomplete and the data cutoff is not provided.",
+          },
+        } : {}),
         groupBy: group_by,
         rowCount: rows.length,
         rows,
