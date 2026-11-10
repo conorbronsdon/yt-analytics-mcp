@@ -684,6 +684,29 @@ describe("assertMonthAligned", () => {
     expect(fake.reportCalls).toEqual([]);
   });
 
+  it("sends the FIRST day of the final month as endDate (API rule, verified live 2026-11-10)", async () => {
+    const res = await call("yt_channel_overview", {
+      start_date: "2026-01-01",
+      end_date: "2026-10-31",
+      group_by: "month",
+    });
+    expect(res.isError).toBeFalsy();
+    expect(fake.reportCalls).toHaveLength(1);
+    expect(fake.reportCalls[0].endDate).toBe("2026-10-01");
+    expect(fake.reportCalls[0].startDate).toBe("2026-01-01");
+  });
+
+  it("also accepts a first-of-month end_date and sends it unchanged", async () => {
+    expect(() => assertMonthAligned("2026-01-01", "2026-10-01")).not.toThrow();
+    const res = await call("yt_channel_overview", {
+      start_date: "2026-01-01",
+      end_date: "2026-10-01",
+      group_by: "month",
+    });
+    expect(res.isError).toBeFalsy();
+    expect(fake.reportCalls[0].endDate).toBe("2026-10-01");
+  });
+
   it("must-not-fire: day and none grouping are never month-checked", async () => {
     // The carve-out's complement. A check applied to every group_by would break
     // the common case.
