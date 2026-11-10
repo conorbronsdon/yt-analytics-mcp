@@ -141,13 +141,33 @@ export function assertMonthAligned(startDate: string, endDate: string): void {
         `Try "${startDate.slice(0, 7)}-01".`,
     );
   }
+  // Callers may express the last month either as its last day (the natural
+  // "whole months" reading) or as its first day (the form the API wants).
+  const endMonth = Number(endDate.slice(5, 7));
+  if (endMonth < 1 || endMonth > 12) {
+    throw new Error(`group_by='month' needs a valid month in end_date, got "${endDate}".`);
+  }
   const expected = lastDayOfMonth(endDate);
-  if (endDate !== expected) {
+  if (endDate !== expected && !endDate.endsWith("-01")) {
     throw new Error(
-      `group_by='month' needs end_date to be the last day of a month, got "${endDate}". ` +
+      `group_by='month' needs end_date to be the first or last day of a month, got "${endDate}". ` +
         `Try "${expected}".`,
     );
   }
+}
+
+/**
+ * The end date to actually send for a `month` report.
+ *
+ * Verified live 2026-11-10: the API rejects a month report whose endDate is the
+ * month's LAST day ("Date range (2026-10-31) in field parameters.end-date does
+ * not align to chosen date dimension") and accepts the FIRST day of the final
+ * month (2026-10-01 returns October in full). The tool keeps accepting a
+ * last-day end_date and snaps it here, so callers can still think in whole
+ * months.
+ */
+export function monthEndForApi(endDate: string): string {
+  return `${endDate.slice(0, 7)}-01`;
 }
 
 /**
@@ -384,7 +404,11 @@ export function createServer(
         "drill into traffic sources or individual videos.",
       inputSchema: {
         start_date: startDateArg,
-        end_date: endDateArg,
+        end_date: endDateArg.describe(
+          "End date, YYYY-MM-DD, inclusive for day or ungrouped reports. " +
+          "For month grouping, the first or last day selects that entire calendar month's bucket; " +
+          "recent data may be incomplete.",
+        ),
         metrics: z
           .array(z.enum(CORE_METRICS))
           .optional()
@@ -404,7 +428,9 @@ export function createServer(
             "'none' returns one summary row for the whole range. 'day' or 'month' " +
               "returns a time series — a 90-day range at 'day' is 90 rows, so keep " +
               "ranges short or use 'month'. 'month' requires start_date to be the " +
-              "1st of a month and end_date to be a month's last day.",
+              "1st of a month and end_date to be a month's last day (or its 1st); " +
+              "either date selects that calendar month's bucket. The server sends the API " +
+              "the 1st of the final month, which is the form it accepts.",
           ),
       },
       annotations: buildAnnotations("Channel performance over a date range"),
@@ -419,7 +445,7 @@ export function createServer(
       const dimensions = group_by === "none" ? undefined : [group_by];
       const res = await need().report({
         startDate: start_date,
-        endDate: end_date,
+        endDate: group_by === "month" ? monthEndForApi(end_date) : end_date,
         metrics: [...metrics],
         dimensions,
         sort: dimensions ? group_by : undefined,
@@ -427,6 +453,14 @@ export function createServer(
       const rows = toObjects(res);
       return json({
         window: { startDate: start_date, endDate: end_date },
+        ...(group_by === "month" ? {
+          monthBuckets: {
+            firstMonth: start_date.slice(0, 7),
+            lastMonth: end_date.slice(0, 7),
+            lastMonthEnds: lastDayOfMonth(end_date),
+            note: "The window records the requested dates. Each monthly row represents its calendar month; lastMonthEnds is the calendar boundary, not a data cutoff. The final month may be incomplete and the data cutoff is not provided.",
+          },
+        } : {}),
         groupBy: group_by,
         rowCount: rows.length,
         rows,

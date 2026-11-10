@@ -674,6 +674,22 @@ describe("assertMonthAligned", () => {
     expect(() => assertMonthAligned("2028-02-01", "2028-02-28")).toThrow(/Try "2028-02-29"/);
   });
 
+  it.each(["2026-00-01", "2026-13-01"])("rejects invalid first-of-month date %s", async (endDate) => {
+    const res = await call("yt_channel_overview", {
+      start_date: "2026-01-01", end_date: endDate, group_by: "month",
+    });
+    expect(res.isError).toBe(true);
+    expect(fake.reportCalls).toEqual([]);
+  });
+
+  it("sends a leap-year single-month range using its first day", async () => {
+    await call("yt_channel_overview", {
+      start_date: "2028-02-01", end_date: "2028-02-29", group_by: "month",
+    });
+    expect(fake.reportCalls[0].startDate).toBe("2028-02-01");
+    expect(fake.reportCalls[0].endDate).toBe("2028-02-01");
+  });
+
   it("blocks a misaligned month report before the request goes out", async () => {
     const res = await call("yt_channel_overview", {
       start_date: "2026-07-06",
@@ -682,6 +698,57 @@ describe("assertMonthAligned", () => {
     });
     expect(res.isError).toBe(true);
     expect(fake.reportCalls).toEqual([]);
+  });
+
+  it("sends the FIRST day of the final month as endDate (API rule, verified live 2026-11-10)", async () => {
+    const res = await call("yt_channel_overview", {
+      start_date: "2026-01-01",
+      end_date: "2026-10-31",
+      group_by: "month",
+    });
+    expect(res.isError).toBeFalsy();
+    expect(fake.reportCalls).toHaveLength(1);
+    expect(fake.reportCalls[0].endDate).toBe("2026-10-01");
+    expect(fake.reportCalls[0].startDate).toBe("2026-01-01");
+  });
+
+  it("also accepts a first-of-month end_date and sends it unchanged", async () => {
+    expect(() => assertMonthAligned("2026-01-01", "2026-10-01")).not.toThrow();
+    const res = await call("yt_channel_overview", {
+      start_date: "2026-01-01",
+      end_date: "2026-10-01",
+      group_by: "month",
+    });
+    expect(res.isError).toBeFalsy();
+    expect(fake.reportCalls[0].endDate).toBe("2026-10-01");
+  });
+
+  it.each(["2026-10-01", "2026-10-31"])(
+    "labels month buckets separately from the requested end date %s",
+    async (endDate) => {
+      fake.reportResponses = [{
+        columnHeaders: [{ name: "month" }, { name: "views" }],
+        rows: [["2026-10", 42]],
+      }];
+      const out = parse(await call("yt_channel_overview", {
+        start_date: "2026-01-01", end_date: endDate, group_by: "month",
+      }));
+      expect(out.window).toEqual({ startDate: "2026-01-01", endDate });
+      expect(out.rows).toEqual([{ month: "2026-10", views: 42 }]);
+      expect(out.monthBuckets).toEqual({
+        firstMonth: "2026-01",
+        lastMonth: "2026-10",
+        lastMonthEnds: "2026-10-31",
+        note: "The window records the requested dates. Each monthly row represents its calendar month; lastMonthEnds is the calendar boundary, not a data cutoff. The final month may be incomplete and the data cutoff is not provided.",
+      });
+    },
+  );
+
+  it.each(["day", "none"])("keeps exact-date metadata for %s grouping", async (groupBy) => {
+    const out = parse(await call("yt_channel_overview", { ...WINDOW, group_by: groupBy }));
+    expect(out.window).toEqual({ startDate: WINDOW.start_date, endDate: WINDOW.end_date });
+    expect(out.monthBuckets).toBeUndefined();
+    expect(fake.reportCalls[0].endDate).toBe(WINDOW.end_date);
   });
 
   it("must-not-fire: day and none grouping are never month-checked", async () => {
