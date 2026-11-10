@@ -674,6 +674,22 @@ describe("assertMonthAligned", () => {
     expect(() => assertMonthAligned("2028-02-01", "2028-02-28")).toThrow(/Try "2028-02-29"/);
   });
 
+  it.each(["2026-00-01", "2026-13-01"])("rejects invalid first-of-month date %s", async (endDate) => {
+    const res = await call("yt_channel_overview", {
+      start_date: "2026-01-01", end_date: endDate, group_by: "month",
+    });
+    expect(res.isError).toBe(true);
+    expect(fake.reportCalls).toEqual([]);
+  });
+
+  it("sends a leap-year single-month range using its first day", async () => {
+    await call("yt_channel_overview", {
+      start_date: "2028-02-01", end_date: "2028-02-29", group_by: "month",
+    });
+    expect(fake.reportCalls[0].startDate).toBe("2028-02-01");
+    expect(fake.reportCalls[0].endDate).toBe("2028-02-01");
+  });
+
   it("blocks a misaligned month report before the request goes out", async () => {
     const res = await call("yt_channel_overview", {
       start_date: "2026-07-06",
@@ -722,7 +738,8 @@ describe("assertMonthAligned", () => {
       expect(out.monthBuckets).toEqual({
         firstMonth: "2026-01",
         lastMonth: "2026-10",
-        note: "The window records the requested dates. Each monthly row covers its calendar month; the final month may be incomplete and the data cutoff is not provided.",
+        lastMonthEnds: "2026-10-31",
+        note: "The window records the requested dates. Each monthly row represents its calendar month; lastMonthEnds is the calendar boundary, not a data cutoff. The final month may be incomplete and the data cutoff is not provided.",
       });
     },
   );

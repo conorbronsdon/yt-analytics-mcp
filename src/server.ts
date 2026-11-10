@@ -143,10 +143,14 @@ export function assertMonthAligned(startDate: string, endDate: string): void {
   }
   // Callers may express the last month either as its last day (the natural
   // "whole months" reading) or as its first day (the form the API wants).
+  const endMonth = Number(endDate.slice(5, 7));
+  if (endMonth < 1 || endMonth > 12) {
+    throw new Error(`group_by='month' needs a valid month in end_date, got "${endDate}".`);
+  }
   const expected = lastDayOfMonth(endDate);
   if (endDate !== expected && !endDate.endsWith("-01")) {
     throw new Error(
-      `group_by='month' needs end_date to be the last day of a month, got "${endDate}". ` +
+      `group_by='month' needs end_date to be the first or last day of a month, got "${endDate}". ` +
         `Try "${expected}".`,
     );
   }
@@ -400,7 +404,11 @@ export function createServer(
         "drill into traffic sources or individual videos.",
       inputSchema: {
         start_date: startDateArg,
-        end_date: endDateArg,
+        end_date: endDateArg.describe(
+          "End date, YYYY-MM-DD, inclusive for day or ungrouped reports. " +
+          "For month grouping, the first or last day selects that entire calendar month's bucket; " +
+          "recent data may be incomplete.",
+        ),
         metrics: z
           .array(z.enum(CORE_METRICS))
           .optional()
@@ -449,7 +457,8 @@ export function createServer(
           monthBuckets: {
             firstMonth: start_date.slice(0, 7),
             lastMonth: end_date.slice(0, 7),
-            note: "The window records the requested dates. Each monthly row covers its calendar month; the final month may be incomplete and the data cutoff is not provided.",
+            lastMonthEnds: lastDayOfMonth(end_date),
+            note: "The window records the requested dates. Each monthly row represents its calendar month; lastMonthEnds is the calendar boundary, not a data cutoff. The final month may be incomplete and the data cutoff is not provided.",
           },
         } : {}),
         groupBy: group_by,
