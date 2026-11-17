@@ -23,7 +23,7 @@ Enforced by construction: `src/client.ts` issues only `fetch(url, { headers })` 
 Enforced by review, not by CI: there are zero `console.log` calls in `src/` (verify with `grep -rn "console\.log" src/ | grep -v __tests__`, which must print nothing). All diagnostics use `console.error`.
 
 **Computed values are labelled.**
-Any response field the server calculated is listed under `computedFields` alongside the API's own numbers — see `src/server.ts:489`, `:770`, `:1024`. Required by YouTube's Developer Policies §III.E.4.h, which prohibits passing derived metrics off as API data. **Unenforced** by any test; it is a review gate.
+Any response field the server calculated is listed under `computedFields` alongside the API's own numbers — see `src/server.ts:523`, `:804`, `:1058`. Required by YouTube's Developer Policies §III.E.4.h, which prohibits passing derived metrics off as API data. **Unenforced** by any test; it is a review gate.
 
 ## Testing
 
