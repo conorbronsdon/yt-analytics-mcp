@@ -23,11 +23,13 @@ export const DEFAULT_CREDENTIAL_PATH = join(
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
 /**
- * Hosts allowed to receive the refresh grant. google-auth writes
- * `oauth2.googleapis.com`; `accounts.google.com` is the legacy endpoint older
- * credential files carry.
+ * The exact endpoints allowed to receive the refresh grant. google-auth writes
+ * `https://oauth2.googleapis.com/token`; older credential files carry the
+ * legacy `https://accounts.google.com/o/oauth2/token`. Matching the whole
+ * endpoint, not just the host, keeps the grant off any other path on these
+ * hosts, and a query, fragment, port or userinfo is refused.
  */
-const TOKEN_HOSTS = new Set(["oauth2.googleapis.com", "accounts.google.com"]);
+const TOKEN_ENDPOINTS = new Set([TOKEN_ENDPOINT, "https://accounts.google.com/o/oauth2/token"]);
 
 /**
  * The URL the refresh grant (client_secret + refresh_token) is posted to.
@@ -47,10 +49,10 @@ export function resolveTokenEndpoint(tokenUri: string | undefined): string {
         `${TOKEN_ENDPOINT} or remove it.`,
     );
   }
-  if (url.protocol !== "https:" || !TOKEN_HOSTS.has(url.hostname)) {
+  if (!TOKEN_ENDPOINTS.has(url.href)) {
     throw new AuthError(
       TOKEN_ENDPOINT,
-      `The credential's token_uri points at ${url.protocol}//${url.host}, which is ` +
+      `The credential's token_uri points at ${url.protocol}//${url.host}${url.pathname}, which is ` +
         "not a Google OAuth token endpoint, so the refresh token was not sent. Set " +
         `token_uri to ${TOKEN_ENDPOINT} or remove it.`,
     );

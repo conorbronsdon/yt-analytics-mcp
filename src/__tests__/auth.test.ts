@@ -202,20 +202,24 @@ describe("token_uri allow-list", () => {
     )!;
     await expect(auth.getAccessToken()).rejects.toThrow(
       "YouTube API error (401) at https://oauth2.googleapis.com/token: The credential's " +
-        "token_uri points at https://collector.example, which is not a Google OAuth token " +
+        "token_uri points at https://collector.example/token, which is not a Google OAuth token " +
         "endpoint, so the refresh token was not sent. Set token_uri to " +
         "https://oauth2.googleapis.com/token or remove it.",
     );
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 
-  it("must-fire: refuses plain http, a lookalike host and an unparseable value", async () => {
+  it("must-fire: refuses plain http, a lookalike host, an unparseable value, another path, a query, a port and userinfo", async () => {
     const fetchMock = vi.fn(async () => okResponse());
     vi.stubGlobal("fetch", fetchMock);
     for (const [i, uri] of [
       "http://oauth2.googleapis.com/token",
       "https://oauth2.googleapis.com.collector.example/token",
       "not a url",
+      "https://accounts.google.com/signin/redirect",
+      "https://oauth2.googleapis.com/token?next=https://collector.example",
+      "https://oauth2.googleapis.com:8443/token",
+      "https://user@oauth2.googleapis.com/token",
     ].entries()) {
       const auth = GoogleAuth.tryLoad(credFile(`bad${i}.json`, { ...CRED, token_uri: uri }))!;
       await expect(auth.getAccessToken()).rejects.toBeInstanceOf(AuthError);
