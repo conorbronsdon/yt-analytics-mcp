@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { AuthError, CredentialMissingError } from "./errors.js";
+import { AuthError, CredentialMissingError, TokenUriRefusedError } from "./errors.js";
 
 /**
  * An OAuth user credential for the YouTube Analytics API, in google-auth's
@@ -46,7 +46,7 @@ export function resolveTokenEndpoint(tokenUri: string | undefined): string {
   try {
     url = new URL(tokenUri);
   } catch {
-    throw new AuthError(
+    throw new TokenUriRefusedError(
       TOKEN_URI_LABEL,
       "The credential's token_uri is not a valid URL, so the refresh token was not " +
         `sent. Set it to ${TOKEN_ENDPOINT} or remove it.`,
@@ -59,7 +59,7 @@ export function resolveTokenEndpoint(tokenUri: string | undefined): string {
     const detail = TOKEN_ENDPOINTS.has(`${url.origin}${url.pathname}`)
       ? `adds a query, fragment or userinfo to ${url.origin}${url.pathname}; those are refused`
       : `points at ${base}, which is not a Google OAuth token endpoint`;
-    throw new AuthError(
+    throw new TokenUriRefusedError(
       TOKEN_URI_LABEL,
       `The credential's token_uri ${detail}, so the refresh token was not sent. Set ` +
         `token_uri to ${TOKEN_ENDPOINT} or remove it.`,

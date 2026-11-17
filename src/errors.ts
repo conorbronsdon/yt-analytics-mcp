@@ -33,6 +33,19 @@ export class AuthError extends YouTubeAPIError {
   }
 }
 
+/**
+ * A credential whose token_uri is refused locally. No request was made, so the
+ * message carries no HTTP status; it stays an AuthError so callers that handle
+ * credential problems keep handling it.
+ */
+export class TokenUriRefusedError extends AuthError {
+  constructor(label: string, detail: string) {
+    super(label, detail);
+    this.message = `Credential refused at ${label}: ${detail}`;
+    this.name = "TokenUriRefusedError";
+  }
+}
+
 export class ScopeError extends YouTubeAPIError {
   constructor(endpoint: string, scope: string) {
     super(

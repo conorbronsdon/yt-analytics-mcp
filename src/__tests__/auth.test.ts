@@ -201,12 +201,23 @@ describe("token_uri allow-list", () => {
       credFile("evil.json", { ...CRED, token_uri: "https://collector.example/token" }),
     )!;
     await expect(auth.getAccessToken()).rejects.toThrow(
-      "YouTube API error (401) at credential token_uri (no request sent): The credential's " +
+      "Credential refused at credential token_uri (no request sent): The credential's " +
         "token_uri points at https://collector.example/token, which is not a Google OAuth token " +
         "endpoint, so the refresh token was not sent. Set token_uri to " +
         "https://oauth2.googleapis.com/token or remove it.",
     );
     expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("a refused token_uri is not reported as an HTTP status", async () => {
+    const auth = GoogleAuth.tryLoad(
+      credFile("nostatus.json", { ...CRED, token_uri: "https://collector.example/token" }),
+    )!;
+    vi.stubGlobal("fetch", vi.fn(async () => okResponse()));
+    const err = (await auth.getAccessToken().catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.name).toBe("TokenUriRefusedError");
+    expect(err.message.includes("(401)")).toBe(false);
   });
 
   it("must-fire: an allowed endpoint plus a query names the refused parts, not their values", async () => {
@@ -219,7 +230,7 @@ describe("token_uri allow-list", () => {
       }),
     )!;
     await expect(auth.getAccessToken()).rejects.toThrow(
-      "YouTube API error (401) at credential token_uri (no request sent): The credential's " +
+      "Credential refused at credential token_uri (no request sent): The credential's " +
         "token_uri adds a query, fragment or userinfo to https://oauth2.googleapis.com/token; " +
         "those are refused, so the refresh token was not sent. Set token_uri to " +
         "https://oauth2.googleapis.com/token or remove it.",
@@ -239,7 +250,7 @@ describe("token_uri allow-list", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("must-fire: refuses plain http, a lookalike host, an unparseable value, another path, a query, a port and userinfo", async () => {
+  it("must-fire: refuses plain http, a lookalike host, an unparseable value, another path, a query, a port, userinfo and a fragment", async () => {
     const fetchMock = vi.fn(async () => okResponse());
     vi.stubGlobal("fetch", fetchMock);
     for (const [i, uri] of [
@@ -250,6 +261,7 @@ describe("token_uri allow-list", () => {
       "https://oauth2.googleapis.com/token?next=https://collector.example",
       "https://oauth2.googleapis.com:8443/token",
       "https://user@oauth2.googleapis.com/token",
+      "https://oauth2.googleapis.com/token#x",
     ].entries()) {
       const auth = GoogleAuth.tryLoad(credFile(`bad${i}.json`, { ...CRED, token_uri: uri }))!;
       await expect(auth.getAccessToken()).rejects.toBeInstanceOf(AuthError);
@@ -264,6 +276,8 @@ describe("token_uri allow-list", () => {
       ["https://oauth2.googleapis.com/token", "https://oauth2.googleapis.com/token"],
       ["https://accounts.google.com/o/oauth2/token", "https://accounts.google.com/o/oauth2/token"],
       [undefined, "https://oauth2.googleapis.com/token"],
+      // WHATWG normalization: case and the default port are the same URL.
+      ["HTTPS://OAUTH2.GOOGLEAPIS.COM:443/token", "https://oauth2.googleapis.com/token"],
     ];
     for (const [i, [uri, expected]] of cases.entries()) {
       const auth = GoogleAuth.tryLoad(credFile(`good${i}.json`, { ...CRED, token_uri: uri }))!;
@@ -276,6 +290,6 @@ describe("token_uri allow-list", () => {
           "&refresh_token=test-refresh-token-not-real&grant_type=refresh_token",
       );
     }
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
