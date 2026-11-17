@@ -220,6 +220,26 @@ describe("error mapping", () => {
     await expect(run()).rejects.toBeInstanceOf(PermissionError);
   });
 
+  it("a Data API scope 403 names youtube.readonly, an Analytics one names yt-analytics.readonly", async () => {
+    // The client's up-front Data-scope check trusts the scopes recorded in the
+    // credential file. When that list is stale, Google's own 403 is what
+    // arrives, and the fix it names has to match the endpoint that refused.
+    respondWith(
+      googleError(403, "Request had insufficient authentication scopes.", "insufficientPermissions"),
+    );
+    const client = new YouTubeClient(fakeAuth({ data: true }));
+    await expect(client.listVideos(["a"])).rejects.toThrow(
+      "This tool needs the https://www.googleapis.com/auth/youtube.readonly OAuth scope",
+    );
+    await expect(client.myChannel()).rejects.toThrow(
+      "This tool needs the https://www.googleapis.com/auth/youtube.readonly OAuth scope",
+    );
+    // Must-fail leg: the Analytics endpoint still names the analytics scope,
+    // and a Data API refusal never does.
+    await expect(run()).rejects.toThrow("This tool needs the yt-analytics.readonly OAuth scope");
+    await expect(client.listVideos(["a"])).rejects.not.toThrow(/yt-analytics\.readonly/);
+  });
+
   it("must-fail leg: a plain 403 is NOT reported as a quota or scope problem", async () => {
     // The complement of the carve-outs above. A mapper that returned QuotaError
     // for every 403 would pass the first assertion in the previous test.

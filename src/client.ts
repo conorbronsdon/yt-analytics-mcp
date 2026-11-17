@@ -107,7 +107,14 @@ export class YouTubeClient {
         /ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(body) ||
         /insufficientPermissions/i.test(reason)
       ) {
-        throw new ScopeError(endpoint, "yt-analytics.readonly");
+        // Name the scope the endpoint that refused actually needs. The scope
+        // check in listVideos/myChannel trusts the `scopes` recorded in the
+        // credential file; if that list is stale, Google's 403 comes from a
+        // Data API endpoint and the fix is youtube.readonly, not analytics.
+        throw new ScopeError(
+          endpoint,
+          url.href.startsWith(DATA_BASE) ? DATA_SCOPE : "yt-analytics.readonly",
+        );
       }
       throw new PermissionError(endpoint);
     }
