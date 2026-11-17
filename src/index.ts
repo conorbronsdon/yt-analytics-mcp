@@ -8,6 +8,7 @@
  * private data.
  */
 
+import { existsSync } from "node:fs";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   ANALYTICS_SCOPE,
@@ -16,6 +17,7 @@ import {
   GoogleAuth,
 } from "./auth.js";
 import { YouTubeClient } from "./client.js";
+import { CREDENTIAL_FORMAT_HINT } from "./errors.js";
 import { createServer } from "./server.js";
 
 async function main() {
@@ -30,7 +32,10 @@ async function main() {
   // has to stay clean JSON-RPC.
   if (!auth) {
     console.error(
-      `Warning: no YouTube OAuth credential at ${credPath}. Tools will error until one exists.`,
+      existsSync(credPath)
+        ? `Warning: the YouTube OAuth credential at ${credPath} is not usable. ` +
+            `${CREDENTIAL_FORMAT_HINT} Tools will error until it is replaced.`
+        : `Warning: no YouTube OAuth credential at ${credPath}. Tools will error until one exists.`,
     );
     console.error(
       `Mint one with an installed-app OAuth flow for ${ANALYTICS_SCOPE} ` +

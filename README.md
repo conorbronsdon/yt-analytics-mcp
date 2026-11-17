@@ -58,7 +58,9 @@ Default location, shared on purpose with the sibling servers and any Google scri
 ~/.config/gws/youtube_credentials.json
 ```
 
-Set `YT_ANALYTICS_CREDENTIALS_PATH` to use a different file.
+Set `YT_ANALYTICS_CREDENTIALS_PATH` to use a different file. Give an absolute path: the server does not expand `~`, and an MCP client passes `env` values through without a shell. See [Setup](#setup) for the config block.
+
+The file is JSON with at least `client_id`, `client_secret`, and `refresh_token`, plus `scopes` so the server can tell which tools will work. That is the shape google-auth's `Credentials.to_json()` writes. A file missing any of the first three is treated as no credential, and the server says the file is not usable.
 
 ### Scopes
 
@@ -74,7 +76,23 @@ Set `YT_ANALYTICS_CREDENTIALS_PATH` to use a different file.
 1. In Google Cloud Console, create an **OAuth client** of type *Desktop app* and download its `client_secret.json`.
 2. Enable both the **YouTube Analytics API** and the **YouTube Data API v3** on that project.
 3. **Set the OAuth consent screen's publishing status to "In production" — click *Publish app*.** See the warning below; this is the step everyone skips.
-4. Run any standard `google-auth-oauthlib` installed-app flow requesting the scopes above and save the result to the path above. About ten lines of Python, one browser consent click.
+4. Run a `google-auth-oauthlib` installed-app flow requesting the scopes above and save `creds.to_json()` to the path above. One browser consent click. For example, with `pip install google-auth-oauthlib` and `client_secret.json` in the current directory:
+
+   ```python
+   from pathlib import Path
+   from google_auth_oauthlib.flow import InstalledAppFlow
+
+   SCOPES = [
+       "https://www.googleapis.com/auth/yt-analytics.readonly",
+       "https://www.googleapis.com/auth/youtube.readonly",  # optional, see Scopes
+   ]
+   creds = InstalledAppFlow.from_client_secrets_file(
+       "client_secret.json", SCOPES
+   ).run_local_server(port=0)
+   out = Path.home() / ".config" / "gws" / "youtube_credentials.json"
+   out.parent.mkdir(parents=True, exist_ok=True)
+   out.write_text(creds.to_json())
+   ```
 
 > ### ⚠️ Publish the app, or your token dies in 7 days
 >
@@ -112,7 +130,21 @@ Then add it to your MCP client config — `.mcp.json` for Claude Code, `claude_d
 }
 ```
 
-No `env` block is needed when the credential is at the default path.
+No `env` block is needed when the credential is at the default path. For a file elsewhere, add one with an absolute path:
+
+```json
+{
+  "mcpServers": {
+    "yt-analytics": {
+      "command": "node",
+      "args": ["/path/to/yt-analytics-mcp/dist/index.js"],
+      "env": {
+        "YT_ANALYTICS_CREDENTIALS_PATH": "/home/you/secrets/youtube_credentials.json"
+      }
+    }
+  }
+}
+```
 
 Then ask your assistant: *"Which YouTube channel am I connected to?"*, then *"Show me traffic sources for the last 30 days,"* then *"Race my last three episodes against each other."*
 
