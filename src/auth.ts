@@ -31,6 +31,9 @@ const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
  */
 const TOKEN_ENDPOINTS = new Set([TOKEN_ENDPOINT, "https://accounts.google.com/o/oauth2/token"]);
 
+/** Where a refused token_uri is reported: no request was made, so no URL. */
+const TOKEN_URI_LABEL = "credential token_uri (no request sent)";
+
 /**
  * The URL the refresh grant (client_secret + refresh_token) is posted to.
  * `token_uri` comes from the credential file; it is honoured only when it is an
@@ -44,16 +47,21 @@ export function resolveTokenEndpoint(tokenUri: string | undefined): string {
     url = new URL(tokenUri);
   } catch {
     throw new AuthError(
-      TOKEN_ENDPOINT,
-      "The credential's token_uri is not a valid URL. Set it to " +
-        `${TOKEN_ENDPOINT} or remove it.`,
+      TOKEN_URI_LABEL,
+      "The credential's token_uri is not a valid URL, so the refresh token was not " +
+        `sent. Set it to ${TOKEN_ENDPOINT} or remove it.`,
     );
   }
   if (!TOKEN_ENDPOINTS.has(url.href)) {
+    const base = `${url.protocol}//${url.host}${url.pathname}`;
+    // An allowed endpoint plus a query, fragment or userinfo: say which parts were
+    // refused without echoing their values, rather than naming the allowed URL.
+    const detail = TOKEN_ENDPOINTS.has(`${url.origin}${url.pathname}`)
+      ? `adds a query, fragment or userinfo to ${url.origin}${url.pathname}; those are refused`
+      : `points at ${base}, which is not a Google OAuth token endpoint`;
     throw new AuthError(
-      TOKEN_ENDPOINT,
-      `The credential's token_uri points at ${url.protocol}//${url.host}${url.pathname}, which is ` +
-        "not a Google OAuth token endpoint, so the refresh token was not sent. Set " +
+      TOKEN_URI_LABEL,
+      `The credential's token_uri ${detail}, so the refresh token was not sent. Set ` +
         `token_uri to ${TOKEN_ENDPOINT} or remove it.`,
     );
   }
@@ -189,7 +197,7 @@ export class GoogleAuth {
       });
     } catch (err) {
       throw new AuthError(
-        TOKEN_ENDPOINT,
+        endpoint,
         `Network error refreshing the access token: ${
           err instanceof Error ? err.message : String(err)
         }`,
@@ -199,7 +207,7 @@ export class GoogleAuth {
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new AuthError(
-        TOKEN_ENDPOINT,
+        endpoint,
         "Token refresh failed (HTTP " +
           response.status +
           "). The refresh token may be revoked or expired — re-mint it with an " +
@@ -213,7 +221,7 @@ export class GoogleAuth {
       expires_in?: number;
     };
     if (!data.access_token) {
-      throw new AuthError(TOKEN_ENDPOINT, "Token endpoint returned no access_token.");
+      throw new AuthError(endpoint, "Token endpoint returned no access_token.");
     }
     this.accessToken = data.access_token;
     this.expiresAt = Date.now() + (data.expires_in ?? 3600) * 1000;

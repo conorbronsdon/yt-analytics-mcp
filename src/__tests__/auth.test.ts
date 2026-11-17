@@ -201,12 +201,42 @@ describe("token_uri allow-list", () => {
       credFile("evil.json", { ...CRED, token_uri: "https://collector.example/token" }),
     )!;
     await expect(auth.getAccessToken()).rejects.toThrow(
-      "YouTube API error (401) at https://oauth2.googleapis.com/token: The credential's " +
+      "YouTube API error (401) at credential token_uri (no request sent): The credential's " +
         "token_uri points at https://collector.example/token, which is not a Google OAuth token " +
         "endpoint, so the refresh token was not sent. Set token_uri to " +
         "https://oauth2.googleapis.com/token or remove it.",
     );
     expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("must-fire: an allowed endpoint plus a query names the refused parts, not their values", async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(
+      credFile("query.json", {
+        ...CRED,
+        token_uri: "https://oauth2.googleapis.com/token?next=https://collector.example",
+      }),
+    )!;
+    await expect(auth.getAccessToken()).rejects.toThrow(
+      "YouTube API error (401) at credential token_uri (no request sent): The credential's " +
+        "token_uri adds a query, fragment or userinfo to https://oauth2.googleapis.com/token; " +
+        "those are refused, so the refresh token was not sent. Set token_uri to " +
+        "https://oauth2.googleapis.com/token or remove it.",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("refresh failures name the endpoint actually used, not the default", async () => {
+    const fetchMock = vi.fn(async () => new Response("bad grant", { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(
+      credFile("legacy-fail.json", { ...CRED, token_uri: "https://accounts.google.com/o/oauth2/token" }),
+    )!;
+    const err = await auth.getAccessToken().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).endpoint).toBe("https://accounts.google.com/o/oauth2/token");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("must-fire: refuses plain http, a lookalike host, an unparseable value, another path, a query, a port and userinfo", async () => {
