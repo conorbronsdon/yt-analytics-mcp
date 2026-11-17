@@ -14,7 +14,7 @@ An MCP server wrapping the YouTube Analytics API v2. Nine tools, all reads, all 
 Enforced: `src/__tests__/annotations.e2e.test.ts:131` filters a real `tools/list` for anything without `readOnlyHint: true` and asserts the list is empty. Line 146 injects a fake `yt_delete_everything` tool as a negative control, proving the filter can go red. Adding a write tool fails CI.
 
 **The server can only read `channel==MINE`.**
-Enforced: `src/client.ts:145` writes `ids=channel==MINE` unconditionally, and `ReportQuery` (`src/client.ts:34`) has no `ids` field, so an override is not expressible. `src/__tests__/client.test.ts:103` passes a hostile `ids` past the type and asserts the built URL is still MINE. Do not reintroduce `q.ids ?? "channel==MINE"` — a default is not an invariant.
+Enforced: `src/client.ts:152` writes `ids=channel==MINE` unconditionally, and `ReportQuery` (`src/client.ts:34`) has no `ids` field, so an override is not expressible. `src/__tests__/client.test.ts:103` passes a hostile `ids` past the type and asserts the built URL is still MINE. Do not reintroduce `q.ids ?? "channel==MINE"` — a default is not an invariant.
 
 **No write path in the HTTP client.**
 Enforced by construction: `src/client.ts` issues only `fetch(url, { headers })` with no `method`, so every request is a GET. Unenforced by a test — if you add a `method` option, nothing currently fails. Treat the class comment at `src/client.ts:52` as the contract.
@@ -23,7 +23,7 @@ Enforced by construction: `src/client.ts` issues only `fetch(url, { headers })` 
 Enforced by review, not by CI: there are zero `console.log` calls in `src/` (verify with `grep -rn "console\.log" src/ | grep -v __tests__`, which must print nothing). All diagnostics use `console.error`.
 
 **Computed values are labelled.**
-Any response field the server calculated is listed under `computedFields` alongside the API's own numbers — see `src/server.ts:523`, `:804`, `:1058`. Required by YouTube's Developer Policies §III.E.4.h, which prohibits passing derived metrics off as API data. **Unenforced** by any test; it is a review gate.
+Any response field the server calculated is listed under `computedFields` alongside the API's own numbers — see `src/server.ts:530`, `:811`, `:1065`. Required by YouTube's Developer Policies §III.E.4.h, which prohibits passing derived metrics off as API data. **Unenforced** by any test; it is a review gate.
 
 ## Testing
 
