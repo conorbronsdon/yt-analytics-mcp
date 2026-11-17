@@ -90,7 +90,16 @@ The server boots and answers `tools/list` with no credential at all, so MCP insp
 
 ## Setup
 
-Add to your MCP client config — `.mcp.json` for Claude Code, `claude_desktop_config.json` for Claude Desktop:
+The package is not on npm yet, so build it from a clone:
+
+```bash
+git clone https://github.com/conorbronsdon/yt-analytics-mcp.git
+cd yt-analytics-mcp
+npm ci
+npm run build
+```
+
+Then add it to your MCP client config — `.mcp.json` for Claude Code, `claude_desktop_config.json` for Claude Desktop:
 
 ```json
 {
