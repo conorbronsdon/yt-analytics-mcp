@@ -22,6 +22,42 @@ export const DEFAULT_CREDENTIAL_PATH = join(
 
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
+/**
+ * Hosts allowed to receive the refresh grant. google-auth writes
+ * `oauth2.googleapis.com`; `accounts.google.com` is the legacy endpoint older
+ * credential files carry.
+ */
+const TOKEN_HOSTS = new Set(["oauth2.googleapis.com", "accounts.google.com"]);
+
+/**
+ * The URL the refresh grant (client_secret + refresh_token) is posted to.
+ * `token_uri` comes from the credential file; it is honoured only when it is an
+ * https Google token endpoint, so an edited or copied file cannot send the
+ * refresh token to another host.
+ */
+export function resolveTokenEndpoint(tokenUri: string | undefined): string {
+  if (!tokenUri) return TOKEN_ENDPOINT;
+  let url: URL;
+  try {
+    url = new URL(tokenUri);
+  } catch {
+    throw new AuthError(
+      TOKEN_ENDPOINT,
+      "The credential's token_uri is not a valid URL. Set it to " +
+        `${TOKEN_ENDPOINT} or remove it.`,
+    );
+  }
+  if (url.protocol !== "https:" || !TOKEN_HOSTS.has(url.hostname)) {
+    throw new AuthError(
+      TOKEN_ENDPOINT,
+      `The credential's token_uri points at ${url.protocol}//${url.host}, which is ` +
+        "not a Google OAuth token endpoint, so the refresh token was not sent. Set " +
+        `token_uri to ${TOKEN_ENDPOINT} or remove it.`,
+    );
+  }
+  return url.href;
+}
+
 /** Read-only access to owner-side YouTube Analytics reports. Required. */
 export const ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly";
 
@@ -134,6 +170,7 @@ export class GoogleAuth {
   }
 
   private async refresh(): Promise<string> {
+    const endpoint = resolveTokenEndpoint(this.cred.token_uri);
     const body = new URLSearchParams({
       client_id: this.cred.client_id!,
       client_secret: this.cred.client_secret!,
@@ -143,7 +180,7 @@ export class GoogleAuth {
 
     let response: Response;
     try {
-      response = await fetch(this.cred.token_uri || TOKEN_ENDPOINT, {
+      response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),
