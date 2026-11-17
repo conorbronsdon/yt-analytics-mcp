@@ -284,6 +284,41 @@ describe("yt_traffic_sources", () => {
     expect(out.totalViews).toBe(0);
     expect(out.rows).toEqual([]);
   });
+
+  it("must-fire: requests views when the caller left it out, since it sorts and divides by it", async () => {
+    // Without views in the request the query sorts on a metric it never asked
+    // for, and totalViews/shareOfViews are computed as 0 from an absent column.
+    fake.reportResponses = [
+      {
+        columnHeaders: [
+          { name: "insightTrafficSourceType" },
+          { name: "estimatedMinutesWatched" },
+          { name: "views" },
+        ],
+        rows: [
+          ["YT_SEARCH", 420, 300],
+          ["SHORTS", 75, 100],
+        ],
+      },
+    ];
+    const out = parse(
+      await call("yt_traffic_sources", { ...WINDOW, metrics: ["estimatedMinutesWatched"] }),
+    );
+    expect(fake.reportCalls[0].metrics).toEqual(["estimatedMinutesWatched", "views"]);
+    expect(fake.reportCalls[0].sort).toBe("-views");
+    expect(out.totalViews).toBe(400);
+    expect(out.rows[0]).toEqual({
+      insightTrafficSourceType: "YT_SEARCH",
+      estimatedMinutesWatched: 420,
+      views: 300,
+      shareOfViews: 0.75,
+    });
+  });
+
+  it("must-not-fire: does not duplicate views when the caller already asked for it", async () => {
+    await call("yt_traffic_sources", { ...WINDOW, metrics: ["views", "engagedViews"] });
+    expect(fake.reportCalls[0].metrics).toEqual(["views", "engagedViews"]);
+  });
 });
 
 describe("yt_top_videos", () => {
@@ -426,6 +461,27 @@ describe("yt_video_performance", () => {
       }),
     );
     expect(out.noDataInWindow).toBeUndefined();
+  });
+
+  it("must-fire: requests views when the caller left it out, since the report sorts by it", async () => {
+    await call("yt_video_performance", {
+      ...WINDOW,
+      video_ids: ["9QQA4TZvEKU"],
+      metrics: ["likes", "comments"],
+      resolve_titles: false,
+    });
+    expect(fake.reportCalls[0].metrics).toEqual(["likes", "comments", "views"]);
+    expect(fake.reportCalls[0].sort).toBe("-views");
+  });
+
+  it("must-not-fire: leaves a metric list that already has views unchanged", async () => {
+    await call("yt_video_performance", {
+      ...WINDOW,
+      video_ids: ["9QQA4TZvEKU"],
+      metrics: ["likes", "views"],
+      resolve_titles: false,
+    });
+    expect(fake.reportCalls[0].metrics).toEqual(["likes", "views"]);
   });
 
   it("rejects an injected filter clause before any request", async () => {
