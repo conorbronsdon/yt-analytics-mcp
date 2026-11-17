@@ -285,16 +285,23 @@ const TITLE_QUOTA_NOTE =
   "(default daily budget: 10,000 units); the Analytics query itself does not draw " +
   "on that budget. Pass resolve_titles=false to return bare video IDs and spend none.";
 
+/** How the default credential location is shown in setup errors. */
+const DEFAULT_CREDENTIAL_DISPLAY = "~/.config/gws/youtube_credentials.json";
+
 export function createServer(
   client: YouTubeClient | null,
   hasDataScope = false,
+  credentialPath: string = DEFAULT_CREDENTIAL_DISPLAY,
 ): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
   /** Resolve the client or raise a per-tool setup error if none is configured. */
   function need(): YouTubeClient {
     if (!client) {
-      throw new CredentialMissingError("~/.config/gws/youtube_credentials.json");
+      // Name the path the server actually looked at. When
+      // YT_ANALYTICS_CREDENTIALS_PATH is set, pointing at the default instead
+      // sends the user to fix a file the server never read.
+      throw new CredentialMissingError(credentialPath);
     }
     return client;
   }

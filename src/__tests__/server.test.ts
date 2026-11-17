@@ -988,6 +988,24 @@ describe("without a credential", () => {
     expect(text(res)).toMatch(/youtube_credentials\.json/);
     expect(text(res)).toMatch(/yt-analytics\.readonly/);
   });
+
+  it("names the credential path it was given, not the default", async () => {
+    // YT_ANALYTICS_CREDENTIALS_PATH flows in as createServer's third argument.
+    // The error must point at that file; the default is a file the server
+    // never read.
+    const server = createServer(null, false, "/srv/creds/yt.json");
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const mcp = new Client({ name: "server-test", version: "1.0.0" });
+    await Promise.all([server.connect(serverTransport), mcp.connect(clientTransport)]);
+    const res = (await mcp.callTool({
+      name: "yt_channel_overview",
+      arguments: { ...WINDOW },
+    })) as unknown as ToolCallResult;
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain("credential not found at /srv/creds/yt.json.");
+    // Must-fail leg: the default path is not what this server looked at.
+    expect(text(res)).not.toContain("~/.config/gws/youtube_credentials.json");
+  });
 });
 
 // Small helpers kept local to the test file.
