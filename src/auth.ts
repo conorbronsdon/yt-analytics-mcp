@@ -194,6 +194,9 @@ export class GoogleAuth {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),
+        // Never follow a redirect: a 307/308 would re-send the grant to a
+        // Location URL that resolveTokenEndpoint never checked.
+        redirect: "manual",
       });
     } catch (err) {
       throw new AuthError(
@@ -201,6 +204,14 @@ export class GoogleAuth {
         `Network error refreshing the access token: ${
           err instanceof Error ? err.message : String(err)
         }`,
+      );
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      throw new AuthError(
+        endpoint,
+        `Token endpoint answered with a redirect (HTTP ${response.status}); the refresh ` +
+          "grant is not re-sent to another URL.",
       );
     }
 

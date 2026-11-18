@@ -269,6 +269,41 @@ describe("token_uri allow-list", () => {
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 
+  it("must-fire: a non-Google token_uri never echoes its userinfo, query or fragment", async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(
+      credFile("echo.json", {
+        ...CRED,
+        token_uri: "https://u:leak1@collector.example/token?k=leak2#leak3",
+      }),
+    )!;
+    const err = (await auth.getAccessToken().catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.message).toContain("points at https://collector.example/token,");
+    expect(err.message).not.toMatch(/leak/);
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("must-fire: a redirect from the token endpoint is not followed", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 307,
+          headers: { Location: "https://collector.example/token" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(credFile("redirect.json", CRED))!;
+    const err = (await auth.getAccessToken().catch((e: unknown) => e)) as AuthError;
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.message).toContain("answered with a redirect (HTTP 307)");
+    expect(err.message).not.toContain("collector.example");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.redirect).toBe("manual");
+  });
+
   it("must-not-fire: Google endpoints and a missing token_uri still refresh", async () => {
     const fetchMock = vi.fn(async () => okResponse());
     vi.stubGlobal("fetch", fetchMock);
