@@ -7,6 +7,8 @@
  * `youtubeanalytics.googleapis.com/v2/reports`; see `parseGoogleError`.
  */
 
+import { existsSync } from "node:fs";
+
 export class YouTubeAPIError extends Error {
   constructor(
     public statusCode: number,
@@ -131,11 +133,26 @@ export class BadRequestError extends YouTubeAPIError {
   }
 }
 
-/** Thrown when the credential file is absent or unreadable. Surfaced per-tool. */
+/**
+ * What a credential file must hold to be loaded: google-auth's
+ * `Credentials.to_json()` output, of which `GoogleAuth.tryLoad` needs these
+ * three fields.
+ */
+export const CREDENTIAL_FORMAT_HINT =
+  "It must be a JSON file with client_id, client_secret and refresh_token, " +
+  "such as google-auth's Credentials.to_json() output.";
+
+/**
+ * Thrown when the credential file is absent or unusable. Surfaced per-tool.
+ * A file that exists but cannot be used is reported as such, so a wrong file
+ * format is not mistaken for a wrong path.
+ */
 export class CredentialMissingError extends Error {
   constructor(path: string) {
     super(
-      `YouTube OAuth credential not found at ${path}. ` +
+      (existsSync(path)
+        ? `YouTube OAuth credential at ${path} is not usable. ${CREDENTIAL_FORMAT_HINT} `
+        : `YouTube OAuth credential not found at ${path}. `) +
         "Mint one by running an installed-app OAuth flow for the " +
         "https://www.googleapis.com/auth/yt-analytics.readonly scope (add " +
         "youtube.readonly if you want video titles resolved) — see the README. " +
