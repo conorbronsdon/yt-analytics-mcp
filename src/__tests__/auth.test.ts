@@ -282,6 +282,14 @@ describe("token_uri allow-list", () => {
     expect(err).toBeInstanceOf(AuthError);
     expect(err.message).toContain("points at https://collector.example/token,");
     expect(err.message).not.toMatch(/leak/);
+    // A non-web scheme keeps userinfo in pathname, so only the scheme is named.
+    const odd = GoogleAuth.tryLoad(
+      credFile("echo2.json", { ...CRED, token_uri: "x:u:leak4@collector.example/p?q" }),
+    )!;
+    const err2 = (await odd.getAccessToken().catch((e: unknown) => e)) as Error;
+    expect(err2).toBeInstanceOf(AuthError);
+    expect(err2.message).toContain("points at the unsupported scheme x:,");
+    expect(err2.message).not.toMatch(/leak/);
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 

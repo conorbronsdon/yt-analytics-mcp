@@ -53,7 +53,12 @@ export function resolveTokenEndpoint(tokenUri: string | undefined): string {
     );
   }
   if (!TOKEN_ENDPOINTS.has(url.href)) {
-    const base = `${url.protocol}//${url.host}${url.pathname}`;
+    // Only echo a web URL's scheme, host and path. For any other scheme the
+    // parser puts everything after the colon (userinfo included) in pathname.
+    const base =
+      url.protocol === "https:" || url.protocol === "http:"
+        ? `${url.protocol}//${url.host}${url.pathname}`
+        : `the unsupported scheme ${url.protocol}`;
     // An allowed endpoint plus a query, fragment or userinfo: say which parts were
     // refused without echoing their values, rather than naming the allowed URL.
     const detail = TOKEN_ENDPOINTS.has(`${url.origin}${url.pathname}`)
