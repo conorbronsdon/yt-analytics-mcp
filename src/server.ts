@@ -513,7 +513,7 @@ export function createServer(
       const res = await need().report({
         startDate: start_date,
         endDate: end_date,
-        metrics: [...metrics],
+        metrics: [...new Set([...metrics, "views"])],
         dimensions: ["insightTrafficSourceType"],
         filters,
         sort: "-views",
@@ -656,7 +656,7 @@ export function createServer(
       const res = await need().report({
         startDate: start_date,
         endDate: end_date,
-        metrics: [...metrics],
+        metrics: [...new Set([...metrics, "views"])],
         dimensions: ["video"],
         filters: [`video==${ids.join(",")}`],
         sort: "-views",
