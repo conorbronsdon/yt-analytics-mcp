@@ -183,3 +183,156 @@ describe("access token minting", () => {
     await expect(auth.getAccessToken()).rejects.toThrow(/Network error refreshing/);
   });
 });
+
+describe("token_uri allow-list", () => {
+  const CRED = {
+    client_id: "example-client-not-real.apps.googleusercontent.com",
+    client_secret: "example-secret-not-real",
+    refresh_token: "test-refresh-token-not-real",
+    scopes: [ANALYTICS_SCOPE],
+  };
+  const okResponse = () =>
+    new Response(JSON.stringify({ access_token: "test-token-not-real", expires_in: 3600 }));
+
+  it("must-fire: refuses a non-Google token_uri and sends nothing", async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(
+      credFile("evil.json", { ...CRED, token_uri: "https://collector.example/token" }),
+    )!;
+    await expect(auth.getAccessToken()).rejects.toThrow(
+      "Credential refused at credential token_uri (no request sent): The credential's " +
+        "token_uri points at https://collector.example/token, which is not a Google OAuth token " +
+        "endpoint, so the refresh token was not sent. Set token_uri to " +
+        "https://oauth2.googleapis.com/token or remove it.",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("a refused token_uri is not reported as an HTTP status", async () => {
+    const auth = GoogleAuth.tryLoad(
+      credFile("nostatus.json", { ...CRED, token_uri: "https://collector.example/token" }),
+    )!;
+    vi.stubGlobal("fetch", vi.fn(async () => okResponse()));
+    const err = (await auth.getAccessToken().catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.name).toBe("TokenUriRefusedError");
+    expect(err.message.includes("(401)")).toBe(false);
+  });
+
+  it("must-fire: an allowed endpoint plus a query names the refused parts, not their values", async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(
+      credFile("query.json", {
+        ...CRED,
+        token_uri: "https://oauth2.googleapis.com/token?next=https://collector.example",
+      }),
+    )!;
+    await expect(auth.getAccessToken()).rejects.toThrow(
+      "Credential refused at credential token_uri (no request sent): The credential's " +
+        "token_uri adds a query, fragment or userinfo to https://oauth2.googleapis.com/token; " +
+        "those are refused, so the refresh token was not sent. Set token_uri to " +
+        "https://oauth2.googleapis.com/token or remove it.",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("refresh failures name the endpoint actually used, not the default", async () => {
+    const fetchMock = vi.fn(async () => new Response("bad grant", { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(
+      credFile("legacy-fail.json", { ...CRED, token_uri: "https://accounts.google.com/o/oauth2/token" }),
+    )!;
+    const err = await auth.getAccessToken().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).endpoint).toBe("https://accounts.google.com/o/oauth2/token");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("must-fire: refuses plain http, a lookalike host, an unparseable value, another path, a query, a port, userinfo and a fragment", async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    for (const [i, uri] of [
+      "http://oauth2.googleapis.com/token",
+      "https://oauth2.googleapis.com.collector.example/token",
+      "not a url",
+      "https://accounts.google.com/signin/redirect",
+      "https://oauth2.googleapis.com/token?next=https://collector.example",
+      "https://oauth2.googleapis.com:8443/token",
+      "https://user@oauth2.googleapis.com/token",
+      "https://oauth2.googleapis.com/token#x",
+    ].entries()) {
+      const auth = GoogleAuth.tryLoad(credFile(`bad${i}.json`, { ...CRED, token_uri: uri }))!;
+      await expect(auth.getAccessToken()).rejects.toBeInstanceOf(AuthError);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("must-fire: a non-Google token_uri never echoes its userinfo, query or fragment", async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(
+      credFile("echo.json", {
+        ...CRED,
+        token_uri: "https://u:leak1@collector.example/token?k=leak2#leak3",
+      }),
+    )!;
+    const err = (await auth.getAccessToken().catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.message).toContain("points at https://collector.example/token,");
+    expect(err.message).not.toMatch(/leak/);
+    // A non-web scheme keeps userinfo in pathname, so only the scheme is named.
+    const odd = GoogleAuth.tryLoad(
+      credFile("echo2.json", { ...CRED, token_uri: "x:u:leak4@collector.example/p?q" }),
+    )!;
+    const err2 = (await odd.getAccessToken().catch((e: unknown) => e)) as Error;
+    expect(err2).toBeInstanceOf(AuthError);
+    expect(err2.message).toContain("points at the unsupported scheme x:,");
+    expect(err2.message).not.toMatch(/leak/);
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("must-fire: a redirect from the token endpoint is not followed", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 307,
+          headers: { Location: "https://collector.example/token" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = GoogleAuth.tryLoad(credFile("redirect.json", CRED))!;
+    const err = (await auth.getAccessToken().catch((e: unknown) => e)) as AuthError;
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err.message).toContain("answered with a redirect (HTTP 307)");
+    expect(err.message).not.toContain("collector.example");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.redirect).toBe("manual");
+  });
+
+  it("must-not-fire: Google endpoints and a missing token_uri still refresh", async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const cases: Array<[string | undefined, string]> = [
+      ["https://oauth2.googleapis.com/token", "https://oauth2.googleapis.com/token"],
+      ["https://accounts.google.com/o/oauth2/token", "https://accounts.google.com/o/oauth2/token"],
+      [undefined, "https://oauth2.googleapis.com/token"],
+      // WHATWG normalization: case and the default port are the same URL.
+      ["HTTPS://OAUTH2.GOOGLEAPIS.COM:443/token", "https://oauth2.googleapis.com/token"],
+    ];
+    for (const [i, [uri, expected]] of cases.entries()) {
+      const auth = GoogleAuth.tryLoad(credFile(`good${i}.json`, { ...CRED, token_uri: uri }))!;
+      expect(await auth.getAccessToken()).toBe("test-token-not-real");
+      const [url, init] = fetchMock.mock.calls[i] as unknown as [string, RequestInit];
+      expect(url).toBe(expected);
+      expect(String(init.body)).toBe(
+        "client_id=example-client-not-real.apps.googleusercontent.com" +
+          "&client_secret=example-secret-not-real" +
+          "&refresh_token=test-refresh-token-not-real&grant_type=refresh_token",
+      );
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+});
