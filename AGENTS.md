@@ -11,7 +11,7 @@ An MCP server wrapping the YouTube Analytics API v2. Nine tools, all reads, all 
 ## The invariants
 
 **Every tool stays read-only.**
-Enforced: the "advertises no write tool at all" test in `src/__tests__/annotations.e2e.test.ts` filters a real `tools/list` for anything without `readOnlyHint: true` and asserts the list is empty. The "must-fail control" test beside it injects a fake `yt_delete_everything` tool, proving the filter can go red. Adding a write tool fails CI.
+Enforced: the "advertises no write tool at all" test in `src/__tests__/annotations.e2e.test.ts` filters a real `tools/list` for anything without `readOnlyHint: true` and asserts the list is empty. The "must-fail control: the assertion above can actually go red" test beside it injects a fake `yt_delete_everything` tool, proving the filter can go red. Adding a write tool fails CI.
 
 **The server can only read `channel==MINE`.**
 Enforced: `YouTubeClient.buildReportUrl` in `src/client.ts` writes `ids=channel==MINE` unconditionally, and the `ReportQuery` interface has no `ids` field, so an override is not expressible. The "cannot be overridden" test in `src/__tests__/client.test.ts` passes a hostile `ids` past the type and asserts the built URL is still MINE. Do not reintroduce `q.ids ?? "channel==MINE"` — a default is not an invariant.
